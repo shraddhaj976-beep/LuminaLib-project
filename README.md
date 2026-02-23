@@ -8,7 +8,7 @@ docker compose up -d --build
 ```
 
 This starts:
-- API: http://localhost:8000
+- API Docs (Swagger): http://localhost:8000/docs (same as http://127.0.0.1:8000/docs)
 - Mock LLM: http://localhost:5100
 - Postgres, Redis, MinIO, and Celery worker
 

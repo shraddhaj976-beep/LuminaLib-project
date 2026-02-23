@@ -65,7 +65,7 @@ async def get_current_user(
     except JWTError as err:
         raise HTTPException(status_code=401, detail="Invalid token") from err
 
-    result = await db.execute(select(User).where(User.email == subject))
+    result = await db.execute(select(User).where(User.username == subject))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -74,12 +74,12 @@ async def get_current_user(
 
 @router.post("/signup")
 async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == user.username))
+    result = await db.execute(select(User).where(User.username == user.username))
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
     db_user = User(
-        email=user.username,
+        username=user.username,
         hashed_password=pwd_context.hash(user.password),
         is_active=True,
     )
@@ -91,7 +91,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == user.username))
+    result = await db.execute(select(User).where(User.username == user.username))
     db_user = result.scalar_one_or_none()
     if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -100,14 +100,18 @@ async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 class ProfileUpdate(BaseModel):
-    email: str | None = None
+    username: str | None = None
     password: str | None = None
     current_password: str
 
 
 @router.get("/me")
 async def get_profile(current_user: User = Depends(get_current_user)):
-    return {"id": current_user.id, "email": current_user.email, "is_active": current_user.is_active}
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "is_active": current_user.is_active,
+    }
 
 
 @router.put("/me")
@@ -118,8 +122,8 @@ async def update_profile(
 ):
     if not pwd_context.verify(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if payload.email:
-        current_user.email = payload.email
+    if payload.username:
+        current_user.username = payload.username
     if payload.password:
         current_user.hashed_password = pwd_context.hash(payload.password)
     await db.commit()

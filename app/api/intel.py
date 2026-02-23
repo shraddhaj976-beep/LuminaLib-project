@@ -43,11 +43,11 @@ async def get_recommendations(
             "id": book_id,
             "title": by_id.get(book_id).title if by_id.get(book_id) else None,
             "author": by_id.get(book_id).author if by_id.get(book_id) else None,
-            "matched_tags": [
-                t for t in (by_id.get(book_id).tags or []) if t in pref_tags
-            ]
-            if by_id.get(book_id)
-            else [],
+            "matched_tags": (
+                [t for t in (by_id.get(book_id).tags or []) if t in pref_tags]
+                if by_id.get(book_id)
+                else []
+            ),
         }
         for book_id in ids
     ]

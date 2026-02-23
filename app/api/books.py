@@ -15,7 +15,7 @@ ROOT_USERNAME = "rootuser"
 
 
 def ensure_root_user(user: User) -> None:
-    username = user.email.split("@", 1)[0].lower() if user.email else ""
+    username = user.username.lower() if user.username else ""
     if username != ROOT_USERNAME:
         raise HTTPException(
             status_code=403,
