@@ -51,10 +51,15 @@ async def upload_book(
 
 @router.get("/")
 async def list_books(
+    page: int = 1,
+    page_size: int = 20,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Book).order_by(Book.id))
+    if page < 1 or page_size < 1 or page_size > 100:
+        raise HTTPException(status_code=400, detail="Invalid pagination params")
+    offset = (page - 1) * page_size
+    result = await db.execute(select(Book).order_by(Book.id).offset(offset).limit(page_size))
     books = result.scalars().all()
     borrower_counts_result = await db.execute(
         select(
@@ -81,8 +86,9 @@ async def list_books(
 @router.put("/{book_id}")
 async def update_book(
     book_id: int,
-    title: str,
-    author: str,
+    title: str | None = Form(None),
+    author: str | None = Form(None),
+    file: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -91,8 +97,18 @@ async def update_book(
     book = result.scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    book.title = title
-    book.author = author
+    if title:
+        book.title = title
+    if author:
+        book.author = author
+    if file:
+        file.file.seek(0)
+        storage = get_storage()
+        key = f"books/{uuid4()}_{file.filename}"
+        content_path = await storage.upload(key, file.file)
+        if book.content_path:
+            await storage.delete(book.content_path)
+        book.content_path = content_path
     await db.commit()
     return {"msg": "Book updated"}
 
@@ -123,6 +139,9 @@ async def delete_book(
             status_code=409,
             detail="Book is currently borrowed and cannot be deleted",
         )
+    storage = get_storage()
+    if book.content_path:
+        await storage.delete(book.content_path)
     await db.execute(delete(Borrow).where(Borrow.book_id == book_id))
     await db.delete(book)
     await db.commit()

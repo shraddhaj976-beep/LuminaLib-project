@@ -90,10 +90,10 @@ async def _aggregate_reviews(book_id: int):
             return
         prompt = render_aggregate_prompt(settings.aggregate_prompt, texts)
         analysis = await llm.aggregate_reviews(texts, prompt=prompt)
-        # store into a separate field or table; here we'll store on book.summary (append)
+        # store in dedicated review_summary field
         q2 = await session.execute(select(models.Book).where(models.Book.id == book_id))
         book = q2.scalar_one()
-        book.summary = (book.summary or "") + "\n\nRolling consensus:\n" + analysis
+        book.review_summary = analysis
         session.add(book)
         await session.commit()
     await engine.dispose()

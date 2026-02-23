@@ -3,11 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
-from app.core.config import settings
 from app.db.base import get_db
-from app.db.models import Book, Review, User
-from app.services.llm import get_llm
-from app.services.prompts import render_aggregate_prompt
+from app.db.models import Book, User, UserPreference
 
 router = APIRouter(tags=["Intel"])
 
@@ -21,14 +18,7 @@ async def get_analysis(
     book = (await db.execute(select(Book).where(Book.id == book_id))).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    result = await db.execute(select(Review.text).where(Review.book_id == book_id))
-    texts = [r[0] for r in result.all() if r[0]]
-    if not texts:
-        return {"book_id": book_id, "summary": ""}
-    llm = get_llm()
-    prompt = render_aggregate_prompt(settings.aggregate_prompt, texts)
-    summary = await llm.aggregate_reviews(texts, prompt=prompt)
-    return {"book_id": book_id, "summary": summary}
+    return {"book_id": book_id, "summary": book.review_summary or ""}
 
 
 @router.get("/recommendations")
@@ -41,6 +31,11 @@ async def get_recommendations(
     ids = await recommend_for_user(current_user.id, db, top_n=10)
     if not ids:
         return {"recommendations": []}
+    prefs_q = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == current_user.id)
+    )
+    prefs = prefs_q.scalars().all()
+    pref_tags = {p.tag for p in prefs}
     books = (await db.execute(select(Book).where(Book.id.in_(ids)))).scalars().all()
     by_id = {b.id: b for b in books}
     recommendations = [
@@ -48,6 +43,11 @@ async def get_recommendations(
             "id": book_id,
             "title": by_id.get(book_id).title if by_id.get(book_id) else None,
             "author": by_id.get(book_id).author if by_id.get(book_id) else None,
+            "matched_tags": [
+                t for t in (by_id.get(book_id).tags or []) if t in pref_tags
+            ]
+            if by_id.get(book_id)
+            else [],
         }
         for book_id in ids
     ]

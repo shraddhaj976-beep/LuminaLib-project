@@ -16,6 +16,9 @@ class Storage(ABC):
     @abstractmethod
     async def download(self, key: str) -> bytes: ...
 
+    @abstractmethod
+    async def delete(self, path_or_key: str) -> None: ...
+
 
 # MinIO implementation (sync boto3 used via threads for simplicity)
 executor = ThreadPoolExecutor(4)
@@ -56,6 +59,17 @@ class MinioStorage(Storage):
 
         return await loop.run_in_executor(executor, get)
 
+    async def delete(self, path_or_key: str) -> None:
+        loop = asyncio.get_running_loop()
+
+        def delete():
+            key = path_or_key
+            if path_or_key.startswith("s3://"):
+                key = path_or_key.split("/", 3)[-1]
+            self.s3.Object(self.bucket, key).delete()
+
+        await loop.run_in_executor(executor, delete)
+
 
 class LocalStorage(Storage):
     def __init__(self, base_path="/data/files"):
@@ -74,6 +88,15 @@ class LocalStorage(Storage):
         path = f"{self.base_path}/{key}"
         with open(path, "rb") as f:
             return f.read()
+
+    async def delete(self, path_or_key: str) -> None:
+        import os
+
+        path = path_or_key
+        if not path_or_key.startswith("/"):
+            path = f"{self.base_path}/{path_or_key}"
+        if os.path.exists(path):
+            os.remove(path)
 
 
 # Factory

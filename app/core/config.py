@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # -----------------
     llm_provider: str = "mock"
     mock_llm_url: str
+    ollama_url: str = "http://ollama:11434"
+    ollama_model: str = "llama3"
     aggregate_prompt: str = (
         "You are an assistant. Aggregate the following reviews into a concise summary "
         "covering overall sentiment, common praise, and common criticisms.\n\nReviews:\n{reviews}"

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_current_user
 from app.db.base import get_db
 from app.db.models import Book, Borrow, Review, User
-from app.tasks.tasks import process_review_sentiment_task
+from app.tasks.tasks import aggregate_reviews_task, process_review_sentiment_task
 
 router = APIRouter(prefix="/books", tags=["Reviews"])
 
@@ -57,4 +57,5 @@ async def submit_review(
     await db.commit()
     await db.refresh(review)
     process_review_sentiment_task.delay(book_id, payload.user_id, payload.text)
+    aggregate_reviews_task.delay(book_id)
     return {"msg": f"Review received for book {book_id}", "review_id": review.id}

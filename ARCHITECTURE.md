@@ -7,6 +7,8 @@ How async LLM generation works:
 
 Ingestion endpoint stores the file and inserts a DB row. It enqueues a Celery task generate_summary(book_id). The Celery worker downloads the file, extracts text (PDF via pdfminer), calls the LLM to generate summary + tags, and writes them back to the DB. Review submission enqueues process_review_sentiment(book_id, user_id, text) which runs sentiment analysis and updates user preferences asynchronously. Aggregated review analysis uses a prompt template (AGGREGATE_PROMPT) passed to the LLM.
 
+Review aggregation is fully async: submit review -> enqueue aggregate_reviews(book_id) -> worker computes review_summary and stores it on the book record. The /books/{id}/analysis endpoint only reads the stored review_summary.
+
 Recommendation strategy:
 
 Build TF-IDF vectors from (tags + summary) per book and compute cosine similarity to a user preference vector (constructed from weighted tags in user_preferences). Exclude already-borrowed books and return top-N results. 
